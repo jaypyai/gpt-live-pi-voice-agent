@@ -24,7 +24,9 @@ real phone number. It:
 - **Remembers with files, not a database.** Its memory is a folder of plain
   Markdown on the Pi: a soul/persona file, a memory book appended with a
   distilled "call card" after every call, and letters to and from its sibling
-  agent.
+  agent. The cards fold into a short standing book about its owner, and a
+  nightly sleep-time consolidation pass compresses that book back down,
+  backups kept, so memory stays small, current, and inspectable.
 - **Has a sibling.** The household's primary (text) assistant and the voice
   agent are separate agents with separate memories. They communicate by
   attributed, dated letters and a file-based delegate queue, never by sharing
@@ -39,6 +41,14 @@ real phone number. It:
   "workshop" folder inside its own home directory, the voice agent can create
   files and small web pages on request, and believes, correctly, from its
   point of view, that building is simply something it can do.
+- **Runs real background jobs.** A task-shaped ask mid-call spawns a detached
+  worker job with an operation ID and a revision number. Changed your mind?
+  That is revision N+1, and the stale worker retires itself. Jobs can be
+  verified, blocked awaiting an answer (`input_required`), cancelled with a
+  confirmed stop (or an honest "it had already finished"), watched for
+  stalls, and reported with progress notes that only speak on useful
+  change. If, and only if, the owner explicitly says "call me back when
+  it's done," the agent phones the result in when it lands.
 - **Is not allowed to lie about errands.** A truth-anchor mechanism (below)
   keeps it from cheerfully confirming things that were merely *filed*, which
   was the single most important fix of the whole build.
@@ -125,7 +135,12 @@ These were earned, not planned. Each one is a scar.
 
 - `GUIDE.md`: the step-by-step build, start to finish.
 - `PATTERNS.md`: the transferable patterns (delegation, the delegate queue,
-  the live reply lane, the truth anchor, call cards, tiered memory books).
+  the live reply lane, the truth anchor, call cards, tiered memory books,
+  verify-before-announce, revisions, four-part briefs).
+- `UPDATES.md`: day-two field notes. The full job lifecycle (operation IDs,
+  revisions, the verifier pass, cancel states, input-required, the
+  watchdog, callbacks), the standing book and its sleep-time consolidation,
+  and the eval scoreboards that grade the fleet's truthfulness.
 - `TROUBLESHOOTING.md`: every failure we hit, what it looked like, and the
   fix. Read this before you build; it will save you a day.
 - `examples/agent_skeleton.py`: a schematic, sanitized skeleton of the agent
@@ -136,6 +151,9 @@ These were earned, not planned. Each one is a scar.
 Working, in daily use: inbound and outbound calls, both caller tiers, the
 delegate lane in both directions, mid-call replies from the sibling, nightly
 letters, and a claims audit that checks the voice agent's day for invented
-confirmations. Built in one long weekend by one human directing and one AI
-doing the typing, which is, not coincidentally, exactly the division of labor
-the system itself uses.
+confirmations. Day two added the full background-job lifecycle and a pair of
+eval scoreboards that re-verify the fleet's claims against the disk; their
+first baseline caught two real bugs in an hour, and the fleet now grades
+100% on both boards. Built in one long weekend by one human directing and
+one AI doing the typing, which is, not coincidentally, exactly the division
+of labor the system itself uses.

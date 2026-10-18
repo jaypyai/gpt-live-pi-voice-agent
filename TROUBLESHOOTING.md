@@ -165,3 +165,22 @@ the hard wall behind it.
 **API key expiry sneaks up.**
 Keys with expiries power production voice paths. Put the expiry date in
 your runbook and calendar when you create the key, not when it dies.
+
+## Jobs
+
+**The verifier cried wolf on a path inside a filename.**
+A job's result named its own progress file, and the path checker's regex
+matched a watched folder name that appeared as a substring of the job's
+own slug, so a real file was reported missing. If you scan free text for
+paths, anchor the match: require a boundary (not a word character, dot,
+slash, or hyphen) before the folder name, or your checker will flag the
+job's own paperwork. The same fix has to land in every copy of the
+checker; we run two (in-call and the out-of-call reporter), and both had
+the bug.
+
+**Announcements that were verified but never stamped.**
+Our out-of-call reporter ran the verification and reported honestly, but
+never wrote the verdict back into the job's status, so the eval board
+scored those announcements as unverified. They were checked; they just
+weren't *recorded* as checked, which, to any auditor, is the same thing.
+Whichever lane verifies first, stamps. First writer wins.

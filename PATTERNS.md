@@ -145,3 +145,38 @@ tier's minute ceiling ≈ $50) *and* the provider platform's spend limit
 with alerting at 80% and hard-stop enforcement on. The agent's ledger gives
 grace (a kind line and a short call when spent); the platform limit gives
 certainty.
+
+## 11. Verify before you announce
+
+A finished worker is a claimant, not a witness. Before any lane speaks a
+result, re-check it against the ground truth it claims about: the result
+file exists and is non-empty, the wrapper's exit code is really 0, and
+every artifact the result names is present on disk. Stamp the verdict
+into the job's record, first writer wins, so every lane grades from the
+same page. When verification fails, the announcement doesn't die, it
+changes tense: "it finished, but I could not verify X" is a sentence an
+agent is allowed to say. "X is done," unverified, is not.
+
+## 12. Revisions, not edits
+
+Give every unit of delegated work an operation ID and a revision number.
+A changed request spawns revision N+1 and retires the old worker with a
+flag it polls for; the old revision is marked superseded and becomes
+invisible to every reporting path. Late results for outdated requests
+are then discarded by construction, not by vigilance. The same move
+handles blocked work: a job parked in `input_required` is never edited
+when the answer arrives; it is superseded by a revision whose brief
+carries the answer. The record ends up showing what was asked, in what
+order, what was replaced, and what was thrown away, which is exactly
+what you need the first time an agent and its owner disagree about what
+happened.
+
+## 13. Four-part briefs
+
+Every delegated task gets a brief in four parts: OBJECTIVE, OUTPUT
+FORMAT, TOOLS AND SOURCES, BOUNDARIES. Underspecified briefs are the
+largest single failure class in multi-agent systems, ahead of model
+capability, and the fix is embarrassingly cheap: a template. Boundaries
+does the most work of the four. It is where "don't guess, park a
+question" and "write only inside this folder" live, in writing, where
+the worker can be graded against them later.

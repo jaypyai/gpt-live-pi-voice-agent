@@ -153,6 +153,35 @@ actually working. Verify behavior from **transcripts**, and make log lines
 carry the whole payload hash or a short marker instead of a truncated
 prefix.
 
+## The push bus
+
+**A publish the server refused still exits 0.**
+The Python NATS client delivers permission violations asynchronously,
+after `flush()` returns, through the error callback. A helper that
+publishes and flushes will report success for a message the server
+dropped on an ACL violation. Register an error callback, wait a beat
+after the flush, and exit nonzero if anything arrived or the connection
+dropped. We proved a refusal two independent ways: the helper's exit
+code and the server's own violation log.
+
+**A one-off probe with bad credentials never exits, and spams the
+server.**
+In the Python client, `max_reconnect_attempts=0` does not mean "do not
+reconnect." It means retry forever. A bad-auth probe loops, logging
+authorization violations server-side the whole time. For probes, use
+`allow_reconnect=False` plus a hard bound on the wait. Production
+publish calls should be bounded the same way, and their failures
+counted somewhere visible rather than swallowed.
+
+**The bus server binds everywhere by default.**
+A stock config listens on all interfaces, with one all-powerful token
+if you let setup hand you one. Ours listens only on the tailnet
+address, runs two per-role users with least-privilege subject ACLs,
+and has the persistence layer off entirely (files are the journal; the
+bus is a doorbell). Verify by connecting to the LAN and loopback
+addresses: both must be refused. "It should be firewalled" is not a
+verification.
+
 ## Money
 
 **"Free" tier surprise.**

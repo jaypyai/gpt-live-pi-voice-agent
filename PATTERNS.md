@@ -55,6 +55,15 @@ is *right there* asking "did she reply yet?" The lane closes the loop:
 
 Real-world loop time, delegate filed → confirmation spoken: under a minute.
 
+*Update, day two afternoon:* the lane gained a push transport (§14). The
+reply is also published to a per-caller channel on the bus, the in-call
+agent subscribes for the length of the call, and the message is woven in
+through this same consumption path, same dedupe, same consume-before-speak
+rule, so a reply arriving by both file and bus is spoken once. The file
+remains the journal and the fallback when the bus is down. Loop time on
+the push path: a few seconds end to end. And because the lane's messages
+are spoken as facts, the channel itself is signed (§15).
+
 ## 4. The truth anchor (anti-confabulation)
 
 The failure: a voice agent with a warm personality will *invent* the other
@@ -180,3 +189,50 @@ capability, and the fix is embarrassingly cheap: a template. Boundaries
 does the most work of the four. It is where "don't guess, park a
 question" and "write only inside this folder" live, in writing, where
 the worker can be graded against them later.
+
+## 14. Doorbell, not mailbox
+
+Polls made the sibling round trip 25 to 60 seconds, and most of that was
+interval, not work. The fix was a small message bus (we run NATS on the
+voice agent's machine; the sibling's host accepts no inbound connections,
+so every sibling connection is initiated from its side). But the bus
+carries almost nothing:
+
+- An event's payload is a *name*: this file exists, this job finished.
+- The content of record stays in the file journal (§2, §3), and consumers
+  read and verify it exactly as they did when they were polling.
+- Replies cross the bus too, but they are woven in through the same
+  dedupe and consume-before-speak path as the file lane.
+
+Latency collapses (delegate filed to watcher awake in about two
+seconds) while the audit story is untouched, because nothing the bus
+says is believed on its own. When the bus or its bridge dies, the
+watchers fall back to polling the journal on their own; when it returns,
+push resumes. Test both directions of that degradation before you need
+them. One deliberate exception: a lane whose timing is governed by a
+semantic rule (our job reporter's announcement grace period) does not
+get faster just because the transport did. The grace is the floor, not
+the poll.
+
+## 15. Sign the channel your agent treats as fact
+
+The reply lane (§3) injects the sibling's sentences into the live call
+as ground truth, an `append_thinking` fact the voice model is told to
+believe. That makes the lane part of the trusted computing base, and it
+should be built like it:
+
+- Least-privilege credentials per role on the transport: each side can
+  publish only its own subjects and subscribe only to the other's. One
+  shared all-powerful token is how a doorbell becomes a master key.
+- An HMAC over every payload, keyed by a secret kept *separate* from
+  the transport credential, held only by the producer and the consumer.
+- Verification before injection. Unsigned or badly signed messages are
+  dropped and logged, never woven in, never spoken.
+- Publishers fail closed: no key, no send, with an error the caller
+  sees.
+
+Know the limit and write it down: signing defeats a leaked transport
+credential, not an attacker who already owns the publisher's machine,
+since the key lives there too. Access control decides who may knock.
+The signature decides whether the voice at the door is really your
+sibling's.

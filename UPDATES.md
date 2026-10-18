@@ -8,6 +8,10 @@
 > revise, verify, block on, cancel, and report, without ever claiming
 > something the disk doesn't agree with. Same rules as the main guide: all
 > names and numbers removed, every failure real.
+>
+> An afternoon session follows the job release: callbacks for the delegate
+> lane, a push bus between the siblings, and the adversarial security
+> review that bus had to survive the day it shipped.
 
 ---
 
@@ -180,6 +184,168 @@ implementations.) Final baseline: **10/10 and 4/4.** The scoreboards
 found two genuine bugs in their first hour. Write the eval before you
 trust the system; it will pay for itself immediately.
 
+---
+
+## Part two: the afternoon session
+
+The morning's system worked, and two things about it itched. Errands
+filed through the voice agent reported back by message only, even when
+the owner had asked to be phoned. And every hop between the siblings was
+a poll: the delegate wake could take ten seconds plus stalls, replies
+rode a two-second file poll, and the measured round trip for "ask her,
+wait, hear the answer" ran 25 to 60 seconds. The afternoon fixed both,
+then spent its last hour defending what it had built.
+
+## Callbacks for delegates, not just jobs
+
+Job callbacks (above) armed on the owner's words. Delegate notes now
+carry the same trick. When the owner files an errand through the voice
+agent and asks, in his own words, for a callback (a fixed phrase list:
+"call me back", "ring me when", and kin), the note is stamped with a
+callback marker before it ever leaves the Pi.
+
+The discipline is all in who can arm it and what happens after:
+
+- Only the caller's own segment of the note is scanned for arming
+  phrases. The voice agent's summary of the conversation sits in the
+  same file, and her words can never arm a call.
+- When the sibling finishes the errand, it writes the usual reply, then
+  checks whether a call with the owner is live right now. If one is,
+  no dial: a callback never interrupts a call.
+- Otherwise it dials first and reports in chat second, so the human
+  hears the outcome from the agent's voice before any message lands.
+- Never for the restricted tier, never twice, and the chat report always
+  says which of the three happened: delivered, failed, or skipped
+  because he was already on a call.
+
+## Filler, on a three-second threshold
+
+Day one banned holding phrases outright, because the voice model
+narrated its own machinery ("let me check with my other self") and the
+narration leaked the architecture. The ban held, but it made genuine
+handoffs feel dead: a real question goes to the brain, the brain takes
+seconds, and silence reads as a dropped call.
+
+The rule is now a threshold instead of a ban. A holding phrase is
+allowed only when the handoff will genuinely take more than about
+three seconds: one short phrase, once. Anything quicker gets an
+instant answer with no filler at all. The same tuning pass fixed a
+truth bug in the backend instructions: the agent had been telling
+callers a filed reminder "would be set when the other agent sees it,"
+which undersold the machinery. A filed reminder reaches the owner as a
+real text. The instructions now say exactly that.
+
+## The push bus: a doorbell, not a mailbox
+
+The polls were the round trip. Replacing them took one small server:
+NATS, running on the Pi, in a sandboxed service unit. Topology was
+forced by the house: the sibling's machine accepts no inbound
+connections at all, so the bus could not live there. It lives on the
+Pi, every sibling connection is outbound from the sibling's side
+through a local forwarder, and the server listens only on the Pi's
+tailnet address.
+
+Three subjects carry the whole protocol:
+
+- a delegate event, whose payload is only a filename;
+- a job-completion event, whose payload is only a job folder name;
+- a reply channel per caller, whose payload is one sentence.
+
+That minimalism is the point. **The bus carries names, not content.**
+Files remain the journal and the fallback on every path: a delegate
+event wakes the watcher, which reads the actual note from disk; a reply
+event is woven into the call through the same consume-and-dedupe path
+as the file lane, so a reply arriving by both routes is spoken once.
+Kill the sibling's bridge and the watcher falls back to its old
+polling path on its own; restart the bridge and push resumes in about
+a second. Both directions of that degradation were tested, not assumed.
+
+Results: delegate filed to watcher awake in about two seconds, replies
+in a live call in a few. One lane deliberately did not get faster: the
+job-completion reporter kept its slower verified scan, because its
+in-call announcement grace period is a semantic floor, not a transport
+delay. Making the transport instant does not make a one-minute grace
+period wrong.
+
+## Attacked within the hour
+
+The bus shipped, and within the hour it was handed to a separate
+security-focused agent on the same Pi with permission to attack it.
+Verdict on the afternoon's first configuration: **HIGH**. The findings,
+all real:
+
+- One shared credential with unrestricted permissions, including the
+  messaging system's admin API surface, most of which the bus never
+  uses.
+- The server listened on every interface, in plaintext.
+- Any holder of the credential could publish on the reply channel, and
+  the voice agent would weave the message in as a fact from its
+  sibling. The duplicate filter is not authentication, and the report
+  said so in those words.
+- The delegate and job subjects were equally forgeable by any
+  credential holder, whatever the downstream consequences.
+- Publish failures were swallowed silently by design, so a dead bus
+  would have looked exactly like a quiet one.
+
+One finding the reviewer could not settle from his sandbox (no root),
+so the operator verified it directly: the Pi's firewall defaults to
+deny and admits only the tailnet interface, so the LAN was never
+actually able to reach the port. His successful connects were same-host
+delivery, not firewall crossings. Same-host and LAN are different
+threat models, and confusing them cuts both ways.
+
+Hardening, same day, each item verified after the change:
+
+- The server binds only the tailnet address. Connects aimed at its LAN
+  and loopback addresses are refused, proven, not just configured.
+- The shared credential is retired. Two per-role users with
+  least-privilege ACLs replaced it: the voice side may publish its own
+  events and subscribe to replies; the sibling side the mirror image.
+  Out-of-ACL attempts are refused and logged by the server, by user and
+  subject.
+- The persistence layer (JetStream) is disabled entirely. The bus
+  needs no store; files are the journal.
+- The service unit is sandboxed (no new privileges, private temp,
+  read-only home, empty capability set, a memory cap), and its
+  directories were tightened from world-readable defaults.
+- Publish failures now count somewhere visible, with sparse warnings,
+  instead of vanishing.
+- End to end re-proven under the new credentials: delegate filed,
+  watcher awake, reply delivered, about two seconds.
+
+Two traps surfaced by the testing itself are in
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md): a refused publish that
+reported success, and a retry setting that means the opposite of what
+it says.
+
+## Signed replies
+
+ACLs narrow who can forge a reply. They do not prove a message is
+genuine, and the reviewer's deepest point was that the voice agent
+treats replies as facts. So the reply channel got cryptography:
+
+- Every reply payload is now a version line carrying an HMAC-SHA256
+  over the reply text, keyed by a secret that is deliberately separate
+  from the bus credentials and held only by the two machines that
+  produce and consume replies.
+- The voice agent verifies before weaving anything in. Unsigned or
+  badly signed messages are dropped and logged, never spoken.
+- The publisher fails closed: no key, no send. A missing key produces
+  an error the worker sees, not a silent unsigned message the agent
+  would drop downstream anyway.
+- Proven against the production verifier in three cases: a properly
+  signed reply verified verbatim; an unsigned publish was dropped; a
+  forgery signed with the wrong key was dropped.
+
+Scope, stated plainly: signing covers the reply lane, the one whose
+messages get spoken as fact. Delegate and job events stay behind the
+ACL split, and their consumer only ever acts on real files, so a
+forged event there can cause a wasted wake, not a false statement.
+And the limit that was put to the owner before he chose this fix still
+stands: signing defeats a leaked bus credential. It does not defeat an
+attacker who already owns the publisher's machine, because the key
+lives there too.
+
 ## New scars, collected
 
 - **A claim is not a fact until the disk agrees.** Verify at the point of
@@ -192,3 +358,17 @@ trust the system; it will pay for itself immediately.
 - **Revisions, not edits.** Work that changes gets a new revision and a
   retired predecessor, never a quiet rewrite. The record stays honest
   about what was asked, in what order, and what was discarded.
+- **A doorbell is not a mailbox.** Push for latency, files for truth.
+  Every fast path we built keeps a slow, verifiable journal underneath
+  it, and a fallback that engages on its own when the fast path dies.
+- **Ship, then red-team your own glue.** The riskiest artifact of the
+  afternoon was not a model. It was a small server config written in
+  twenty minutes. It was attacked within the hour and fixed the same
+  day, which is the only reason it is safe to describe here.
+- **A refused publish can report success.** Async clients deliver
+  permission errors after the flush returns. If your helper does not
+  wait and check, your tooling will lie to you politely, in writing,
+  with exit code 0.
+- **Access control is not authenticity.** ACLs decide who may speak on
+  a channel. A signature decides whether this message is real. A
+  channel whose contents an agent treats as fact deserves both.

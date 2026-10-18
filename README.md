@@ -31,6 +31,11 @@ real phone number. It:
   agent are separate agents with separate memories. They communicate by
   attributed, dated letters and a file-based delegate queue, never by sharing
   one memory tree. (We tried the shared tree first. See "Design law 2.")
+  Since the afternoon of day two they also share a small push bus (a NATS
+  server on the Pi): delegate events and replies land in seconds instead
+  of on polls, the files stay the journal underneath, and every reply is
+  HMAC-signed, because the voice agent treats those replies as facts.
+  (See [PATTERNS.md](PATTERNS.md) §14 and §15.)
 - **Runs a tiered caller gate.** Only pre-approved numbers reach it at all.
   The owner gets the full agent (brain, memory, tools). A second household
   member gets a deliberately sandboxed tier: warm conversation, language
@@ -73,10 +78,11 @@ real phone number. It:
                         │ agent CLI │ │  letters/ delegate/      │
                         │ (profile) │ │  workshop/ outbox/       │
                         └───────────┘ └───▲──────────────────────┘
-                                        │ rsync / file drops
+                                        │ files + push events
                         ┌───────────────┴─────────────┐
                         │ Sibling assistant (text)    │
-                        │ watches delegate/ every 1m, │
+                        │ woken by push events (the   │
+                        │ bus lives on the Pi),       │
                         │ writes nightly letters,     │
                         │ replies into live calls     │
                         └─────────────────────────────┘
@@ -119,6 +125,11 @@ These were earned, not planned. Each one is a scar.
    with hard-stop enforcement as a second, independent wall.
 7. **A question is not an order, and a transcript is not a command.** The
    agents treat each other's notes as information, never as instructions.
+8. **Access control is not authenticity.** The moment one agent treats
+   another's messages as facts, that channel is trusted computing base.
+   Ours got least-privilege credentials per role *and* a signature on
+   every message, verified before anything is spoken. A lock decides who
+   may knock; a signature decides who is actually at the door.
 
 ## What it costs (October 2026 prices)
 
@@ -140,7 +151,10 @@ These were earned, not planned. Each one is a scar.
 - [`UPDATES.md`](UPDATES.md): day-two field notes. The full job lifecycle (operation IDs,
   revisions, the verifier pass, cancel states, input-required, the
   watchdog, callbacks), the standing book and its sleep-time consolidation,
-  and the eval scoreboards that grade the fleet's truthfulness.
+  and the eval scoreboards that grade the fleet's truthfulness. The
+  afternoon session adds delegate callbacks, the push bus that replaced
+  the polls, the adversarial review that attacked it within the hour, and
+  the hardening and reply signing that followed.
 - [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md): every failure we hit, what it looked like, and the
   fix. Read this before you build; it will save you a day.
 - [`examples/agent_skeleton.py`](examples/agent_skeleton.py): a schematic, sanitized skeleton of the agent
@@ -154,6 +168,10 @@ letters, and a claims audit that checks the voice agent's day for invented
 confirmations. Day two added the full background-job lifecycle and a pair of
 eval scoreboards that re-verify the fleet's claims against the disk; their
 first baseline caught two real bugs in an hour, and the fleet now grades
-100% on both boards. Built in one long weekend by one human directing and
+100% on both boards. The afternoon of day two replaced the polling
+between the siblings with a signed push bus (delegate wake now ~2 s),
+which was handed to a security-focused agent for adversarial review the
+day it shipped; every finding was fixed, or disproven by direct
+verification, the same day. Built in one long weekend by one human directing and
 one AI doing the typing, which is, not coincidentally, exactly the division
 of labor the system itself uses.

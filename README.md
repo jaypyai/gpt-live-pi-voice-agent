@@ -112,7 +112,7 @@ These were earned, not planned. Each one is a scar.
    messages, errands) is *filed* the moment it's asked, and the agent's
    vocabulary is fenced: it may say *filed* or *passed along*; the words
    *done, set, sent, confirmed* are banned in its own voice until a real
-   confirmation arrives. See PATTERNS.md, "The truth anchor."
+   confirmation arrives. See [PATTERNS.md](PATTERNS.md), "The truth anchor."
 6. **Cap the money twice.** A local usage ledger on the Pi enforces a monthly
    voice-minute budget (the agent still answers when it's spent, says one kind
    line, and closes), and the API provider's own project spend limit is set
@@ -133,17 +133,17 @@ These were earned, not planned. Each one is a scar.
 
 ## Repo layout
 
-- `GUIDE.md`: the step-by-step build, start to finish.
-- `PATTERNS.md`: the transferable patterns (delegation, the delegate queue,
+- [`GUIDE.md`](GUIDE.md): the step-by-step build, start to finish.
+- [`PATTERNS.md`](PATTERNS.md): the transferable patterns (delegation, the delegate queue,
   the live reply lane, the truth anchor, call cards, tiered memory books,
   verify-before-announce, revisions, four-part briefs).
-- `UPDATES.md`: day-two field notes. The full job lifecycle (operation IDs,
+- [`UPDATES.md`](UPDATES.md): day-two field notes. The full job lifecycle (operation IDs,
   revisions, the verifier pass, cancel states, input-required, the
   watchdog, callbacks), the standing book and its sleep-time consolidation,
   and the eval scoreboards that grade the fleet's truthfulness.
-- `TROUBLESHOOTING.md`: every failure we hit, what it looked like, and the
+- [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md): every failure we hit, what it looked like, and the
   fix. Read this before you build; it will save you a day.
-- `examples/agent_skeleton.py`: a schematic, sanitized skeleton of the agent
+- [`examples/agent_skeleton.py`](examples/agent_skeleton.py): a schematic, sanitized skeleton of the agent
   worker showing the moving parts. Excerpt, not production code.
 
 ## Status
